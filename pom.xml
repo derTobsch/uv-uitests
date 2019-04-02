@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.synyx.urlaubsverwaltung</groupId>
+  <artifactId>ui-tests</artifactId>
+  <version>1.0-SNAPSHOT</version>
+
+  <properties>
+    <java.version>11</java.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.resources.sourceEncoding>UTF-8</project.resources.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <customNetworkName>urlaubsverwaltung-uitests-${maven.build.timestamp}</customNetworkName>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <version>5.1.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <version>2.25.1</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>de.retest</groupId>
+      <artifactId>recheck-web</artifactId>
+      <version>1.0.1</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+
+    <plugins>
+      <plugin>
+        <groupId>io.fabric8</groupId>
+        <artifactId>docker-maven-plugin</artifactId>
+        <version>0.28.0</version>
+        <executions>
+          <execution>
+            <id>docker-prepare-integration-test</id>
+            <phase>pre-integration-test</phase>
+            <goals>
+              <goal>build</goal>
+              <goal>start</goal>
+            </goals>
+            <configuration>
+              <imagePullPolicy>Always</imagePullPolicy>
+              <startParallel>true</startParallel>
+              <autoCreateCustomNetworks>true</autoCreateCustomNetworks>
+              <images>
+                <!-- Selenium -->
+                <image>
+                  <name>selenium/standalone-chrome:3.141.59-mercury</name>
+                  <run>
+                    <network>
+                      <mode>custom</mode>
+                      <name>${customNetworkName}</name>
+                      <alias>selenium</alias>
+                    </network>
+                    <ports>
+                      <port>4444:4444</port>
+                    </ports>
+                    <volumes>
+                      <bind>
+                        <volume>
+                          /dev/shm:/dev/shm
+                        </volume>
+                      </bind>
+                    </volumes>
+                  </run>
+                </image>
+
+                <!-- Urlaubsverwaltung -->
+                <image>
+                  <name>synyx/urlaubsverwaltung:latest</name>
+                  <run>
+                    <env>
+                      <SPRING_PROFILES_ACTIVE>dev</SPRING_PROFILES_ACTIVE>
+                      <MANAGEMENT_HEALTH_MAIL_ENABLED>false</MANAGEMENT_HEALTH_MAIL_ENABLED>
+                      <MANAGEMENT_HEALTH_LDAP_ENABLED>false</MANAGEMENT_HEALTH_LDAP_ENABLED>
+                    </env>
+                    <network>
+                      <mode>custom</mode>
+                      <name>${customNetworkName}</name>
+                      <alias>urlaubsverwaltung</alias>
+                    </network>
+                    <ports>
+                      <port>8080:8080</port>
+                    </ports>
+                    <wait>
+                      <http>
+                        <url>http://localhost:8080/actuator/health</url>
+                      </http>
+                      <time>60000</time>
+                    </wait>
+                  </run>
+                </image>
+              </images>
+            </configuration>
+          </execution>
+          <execution>
+            <id>docker-stop</id>
+            <phase>post-integration-test</phase>
+            <goals>
+              <goal>stop</goal>
+            </goals>
+            <configuration>
+              <removeVolumes>true</removeVolumes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.22.1</version>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>2.22.1</version>
+        <configuration>
+          <includes>
+            <include>**/*Test.java</include>
+          </includes>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.8.0</version>
+        <configuration>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
+          <encoding>${project.build.sourceEncoding}</encoding>
+          <showWarnings>true</showWarnings>
+          <showDeprecation>true</showDeprecation>
+        </configuration>
+      </plugin>
+
+    </plugins>
+  </build>
+</project>
